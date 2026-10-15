@@ -1,19 +1,28 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/anaconda
+// README at: https://github.com/devcontainers/templates/tree/main/src/miniconda
 {
-	"name": "Anaconda (Python 3)",
-	"build": {
+	"name": "Miniconda (Python 3)",
+	"build": { 
 		"context": "..",
 		"dockerfile": "Dockerfile"
 	},
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "nbstripout --install --attributes .gitattributes",
-	// Configure tool-specific properties.
-	// "customizations": {},
+
+	// Instala kernel de Jupyter y nbstripout, y registra el filtro de git (.gitattributes)
+	"postCreateCommand": "pip install --no-cache-dir ipykernel nbstripout && nbstripout --install --attributes .gitattributes",
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-toolsai.jupyter",
+				"ms-toolsai.jupyter-keymap",
+				"ms-toolsai.jupyter-renderers",
+				"ms-toolsai.vscode-jupyter-cell-tags",
+				"ms-toolsai.vscode-jupyter-slideshow"
+			]
+		}
+	}
+
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

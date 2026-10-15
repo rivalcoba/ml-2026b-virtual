@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/Cintillos_MIA.png" alt="Cintillo MIA" width="100%" />
+  <img src="images/Cintillos_MIA.png" alt="Cintillo MIA" width="100%" />
 </p>
 
 # APRENDIZAJE AUTOMÁTICO

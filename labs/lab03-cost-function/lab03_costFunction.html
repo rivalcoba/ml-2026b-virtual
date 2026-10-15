@@ -1,0 +1,396 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Función costo interactiva</title>
+<style>
+  :root {
+    --text: #2c2c2b;
+    --muted: #7d7a75;
+    --canvas: #ffffff;
+    --surface: #f9f8f7;
+    --surface-2: #f0efed;
+    --border: #e6e5e3;
+    --blue: #2783de;
+    --blue-soft: #e5f2fc;
+    --green: #46a171;
+    --green-soft: #e8f1ec;
+    --orange: #d5803b;
+    --orange-soft: #fbebde;
+    --red: #e56458;
+    --red-soft: #fce9e7;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #ffffff;
+      --muted: rgba(255,255,255,.66);
+      --canvas: #191919;
+      --surface: #202020;
+      --surface-2: #383836;
+      --border: rgba(255,255,255,.20);
+      --blue: #5e9fe8;
+      --blue-soft: rgba(94,159,232,.14);
+      --green: #72bc8f;
+      --green-soft: rgba(114,188,143,.14);
+      --orange: #de9255;
+      --orange-soft: rgba(222,146,85,.14);
+      --red: #e97366;
+      --red-soft: rgba(233,115,102,.14);
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Arial, sans-serif;
+  }
+  .app {
+    width: min(1160px, 100%);
+    margin: 0 auto;
+    padding: 18px;
+  }
+  .hero {
+    display: grid;
+    grid-template-columns: 1.25fr .75fr;
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 16px;
+  }
+  .title-card, .controls, .panel, .stat {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .title-card { padding: 18px 20px; }
+  h1 {
+    font-size: clamp(22px, 3.5vw, 34px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    margin: 0 0 8px;
+  }
+  .subtitle { margin: 0; color: var(--muted); max-width: 68ch; }
+  .controls { padding: 16px; display: grid; gap: 14px; }
+  .control-row { display: grid; grid-template-columns: 34px 1fr 74px; gap: 10px; align-items: center; }
+  .control-row label { font-weight: 650; font-size: 15px; }
+  .value-pill {
+    justify-self: end;
+    min-width: 68px;
+    text-align: right;
+    padding: 5px 8px;
+    border-radius: 8px;
+    background: var(--blue-soft);
+    color: var(--blue);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--blue); min-height: 32px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    border: 1px solid var(--border);
+    background: var(--canvas);
+    color: var(--text);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font: inherit;
+    cursor: pointer;
+    min-height: 40px;
+  }
+  button.primary { background: var(--blue); color: white; border-color: var(--blue); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--blue-soft); outline-offset: 2px; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat { padding: 13px 14px; }
+  .stat small { display: block; color: var(--muted); margin-bottom: 3px; }
+  .stat strong { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel { padding: 14px; min-width: 0; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  h2 { font-size: 16px; line-height: 1.25; margin: 0; letter-spacing: -0.01em; }
+  .hint { color: var(--muted); font-size: 12px; text-align: right; }
+  .canvas-wrap {
+    position: relative;
+    border: 1px solid var(--border);
+    background: var(--canvas);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 350px;
+  }
+  #surface { cursor: grab; touch-action: none; }
+  #surface.dragging { cursor: grabbing; }
+  canvas { display: block; width: 100%; height: 350px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .key { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 3px; border-radius: 2px; background: var(--blue); }
+  .swatch.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text); }
+  .swatch.red { background: var(--red); }
+  .swatch.orange { background: var(--orange); }
+  .note {
+    margin-top: 14px;
+    padding: 12px 14px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .math { color: var(--text); font-weight: 650; }
+  @media (max-width: 840px) {
+    .hero, .viz-grid { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    canvas { height: 320px; }
+    .canvas-wrap { min-height: 320px; }
+  }
+  @media (max-width: 460px) {
+    .app { padding: 12px; }
+    .control-row { grid-template-columns: 28px 1fr; }
+    .value-pill { grid-column: 2; justify-self: stretch; text-align: center; }
+    .panel-head { display: block; }
+    .hint { text-align: left; margin-top: 2px; }
+  }
+</style>
+<div class="app">
+  <section class="hero" aria-label="Introducción y controles">
+    <div class="title-card">
+      <h1>Función costo para regresión lineal</h1>
+      <p class="subtitle">Explora cómo los parámetros <span class="math">w</span> y <span class="math">b</span> cambian el error cuadrático medio. La superficie muestra <span class="math">J(w,b)</span>; el panel derecho muestra la recta <span class="math">f<sub>w,b</sub>(x)=wx+b</span>, los datos y los residuales.</p>
+    </div>
+    <div class="controls" aria-label="Controles de parámetros">
+      <div class="control-row">
+        <label for="wRange">w</label>
+        <input id="wRange" type="range" min="-1" max="4" step="0.01" value="1.10" aria-label="Pendiente w" />
+        <output id="wOut" class="value-pill" for="wRange">1.10</output>
+      </div>
+      <div class="control-row">
+        <label for="bRange">b</label>
+        <input id="bRange" type="range" min="-3" max="6" step="0.01" value="0.60" aria-label="Intercepto b" />
+        <output id="bOut" class="value-pill" for="bRange">0.60</output>
+      </div>
+      <div class="buttons">
+        <button class="primary" id="bestBtn">Ir al mínimo</button>
+        <button id="startBtn">Punto inicial</button>
+        <button id="animateBtn">Animar descenso</button>
+      </div>
+    </div>
+  </section>
+  <section class="stats" aria-label="Métricas actuales">
+    <div class="stat"><small>Costo actual J(w,b)</small><strong id="costStat">0.00</strong></div>
+    <div class="stat"><small>Mejor ajuste del conjunto</small><strong id="bestStat">w=0, b=0</strong></div>
+    <div class="stat"><small>Error residual promedio</small><strong id="resStat">0.00</strong></div>
+  </section>
+  <section class="viz-grid" aria-label="Visualizaciones interactivas">
+    <article class="panel">
+      <div class="panel-head"><h2>Superficie de costo J(w,b)</h2><span class="hint">Arrastra para rotar · Punto naranja = selección actual</span></div>
+      <div class="canvas-wrap"><canvas id="surface" tabindex="0" role="img" aria-label="Superficie de costo de w y b. Arrastra para rotar o usa las flechas del teclado. Inicio restablece la vista."></canvas></div>
+      <div class="buttons" style="margin-top:10px"><button id="resetViewBtn">Restablecer vista</button></div>
+      <div class="legend"><span class="key"><span class="swatch orange"></span>Selección actual</span><span class="key"><span class="swatch red"></span>Costo alto</span><span class="key"><span class="swatch"></span>Costo bajo</span></div>
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2>Ajuste de la recta y residuales</h2><span class="hint">Líneas rojas = errores</span></div>
+      <div class="canvas-wrap"><canvas id="fit" role="img" aria-label="Puntos del conjunto de datos, recta de regresión actual y errores residuales"></canvas></div>
+      <div class="legend"><span class="key"><span class="swatch dot"></span>Datos</span><span class="key"><span class="swatch"></span>Recta estimada</span><span class="key"><span class="swatch red"></span>Residual</span></div>
+    </article>
+  </section>
+  <div class="note">El costo se calcula como <span class="math">J(w,b) = 1/(2m) · Σ(wx + b − y)²</span>. Cuando el punto naranja baja por la superficie, la recta se acerca mejor a los puntos y los residuales se acortan.</div>
+</div>
+<script>
+(() => {
+  const css = getComputedStyle(document.documentElement);
+  const C = {
+    text: css.getPropertyValue('--text').trim(), muted: css.getPropertyValue('--muted').trim(), canvas: css.getPropertyValue('--canvas').trim(),
+    border: css.getPropertyValue('--border').trim(), blue: css.getPropertyValue('--blue').trim(), green: css.getPropertyValue('--green').trim(),
+    orange: css.getPropertyValue('--orange').trim(), red: css.getPropertyValue('--red').trim()
+  };
+  const data = [
+    {x:0.4,y:1.05},{x:0.9,y:1.85},{x:1.4,y:2.25},{x:2.0,y:3.10},{x:2.7,y:4.05},
+    {x:3.2,y:4.55},{x:3.8,y:5.15},{x:4.3,y:6.10},{x:5.0,y:6.65},{x:5.6,y:7.70}
+  ];
+  const wRange = document.getElementById('wRange');
+  const bRange = document.getElementById('bRange');
+  const wOut = document.getElementById('wOut');
+  const bOut = document.getElementById('bOut');
+  const costStat = document.getElementById('costStat');
+  const bestStat = document.getElementById('bestStat');
+  const resStat = document.getElementById('resStat');
+  const surface = document.getElementById('surface');
+  const fit = document.getElementById('fit');
+  const sctx = surface.getContext('2d');
+  const fctx = fit.getContext('2d');
+  const wMin = -1, wMax = 4, bMin = -3, bMax = 6;
+  let raf = null;
+  let azimuth = -Math.PI / 4, elevation = 0.55;
+  let drag = null;
+
+  function fitCanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: rect.width, h: rect.height };
+  }
+  function cost(w,b) {
+    let total = 0;
+    for (const p of data) { const e = (w*p.x + b) - p.y; total += e*e; }
+    return total / (2 * data.length);
+  }
+  function meanResidual(w,b) {
+    return data.reduce((a,p) => a + Math.abs(w*p.x + b - p.y), 0) / data.length;
+  }
+  function bestFit() {
+    const n = data.length;
+    const sx = data.reduce((a,p)=>a+p.x,0), sy = data.reduce((a,p)=>a+p.y,0);
+    const sxx = data.reduce((a,p)=>a+p.x*p.x,0), sxy = data.reduce((a,p)=>a+p.x*p.y,0);
+    const w = (n*sxy - sx*sy) / (n*sxx - sx*sx);
+    const b = (sy - w*sx) / n;
+    return {w,b};
+  }
+  const best = bestFit();
+  bestStat.textContent = `w=${best.w.toFixed(2)}, b=${best.b.toFixed(2)}`;
+  function cameraPoint(nx, ny, nz) {
+    const c = Math.cos(azimuth), s = Math.sin(azimuth);
+    const horizontal = nx*c + ny*s;
+    const depth = -nx*s + ny*c;
+    return {x: horizontal, y: depth*Math.sin(elevation)-nz*Math.cos(elevation), depth: depth*Math.cos(elevation)+nz*Math.sin(elevation)};
+  }
+  function project(w,b,j, dims) {
+    const nx = (w-wMin)/(wMax-wMin)-.5;
+    const ny = (b-bMin)/(bMax-bMin)-.5;
+    const nz = Math.min(j/8,1.25)*.7;
+    const corners = [];
+    for (const x of [-.5,.5]) for (const y of [-.5,.5]) for (const z of [0,.875]) corners.push(cameraPoint(x,y,z));
+    const xs=corners.map(p=>p.x), ys=corners.map(p=>p.y);
+    const xmin=Math.min(...xs), xmax=Math.max(...xs), ymin=Math.min(...ys), ymax=Math.max(...ys);
+    const scale=Math.min((dims.w-70)/(xmax-xmin),(dims.h-65)/(ymax-ymin));
+    const p=cameraPoint(nx,ny,nz);
+    return {x:dims.w/2+(p.x-(xmin+xmax)/2)*scale,y:dims.h/2+(p.y-(ymin+ymax)/2)*scale,depth:p.depth};
+  }
+  function costColor(j) {
+    const t = Math.max(0, Math.min(1, j / 9));
+    const a = Math.round(220 - 120*t);
+    if (t < .45) return `rgba(39,131,222,${0.20 + t*.45})`;
+    if (t < .75) return `rgba(213,128,59,${0.28 + t*.35})`;
+    return `rgba(229,100,88,${0.38 + t*.38})`;
+  }
+  function drawSurface(w,b) {
+    const dims = fitCanvas(surface);
+    sctx.clearRect(0,0,dims.w,dims.h);
+    sctx.fillStyle = C.canvas; sctx.fillRect(0,0,dims.w,dims.h);
+    const stepsW = 34, stepsB = 34;
+    const grid = [];
+    for (let i=0;i<=stepsW;i++) {
+      grid[i] = [];
+      const ww = wMin + (wMax-wMin)*i/stepsW;
+      for (let k=0;k<=stepsB;k++) {
+        const bb = bMin + (bMax-bMin)*k/stepsB;
+        grid[i][k] = { w: ww, b: bb, j: cost(ww,bb) };
+      }
+    }
+    const faces=[];
+    for (let i=0;i<stepsW;i++) for (let k=0;k<stepsB;k++) {
+      const vertices=[grid[i][k],grid[i+1][k],grid[i+1][k+1],grid[i][k+1]];
+      const points=vertices.map(v=>project(v.w,v.b,v.j,dims));
+      faces.push({points,j:vertices.reduce((sum,v)=>sum+v.j,0)/4,depth:points.reduce((sum,p)=>sum+p.depth,0)/4});
+    }
+    faces.sort((a,b)=>b.depth-a.depth);
+    for(const face of faces) {
+      sctx.beginPath(); face.points.forEach((p,index)=>index?sctx.lineTo(p.x,p.y):sctx.moveTo(p.x,p.y)); sctx.closePath();
+      sctx.fillStyle=costColor(face.j); sctx.fill();
+    }
+    sctx.strokeStyle = 'rgba(125,122,117,.24)'; sctx.lineWidth = 1;
+    for (let i=0;i<=stepsW;i+=4) { sctx.beginPath(); for (let k=0;k<=stepsB;k++) { const p = project(grid[i][k].w, grid[i][k].b, grid[i][k].j, dims); k ? sctx.lineTo(p.x,p.y) : sctx.moveTo(p.x,p.y); } sctx.stroke(); }
+    for (let k=0;k<=stepsB;k+=4) { sctx.beginPath(); for (let i=0;i<=stepsW;i++) { const p = project(grid[i][k].w, grid[i][k].b, grid[i][k].j, dims); i ? sctx.lineTo(p.x,p.y) : sctx.moveTo(p.x,p.y); } sctx.stroke(); }
+    const p = project(w,b,cost(w,b), dims);
+    sctx.beginPath(); sctx.arc(p.x, p.y, 8, 0, Math.PI*2); sctx.fillStyle = C.orange; sctx.fill();
+    sctx.lineWidth = 3; sctx.strokeStyle = C.canvas; sctx.stroke();
+    sctx.fillStyle = C.muted; sctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, Arial';
+    for (const axis of [{w:wMax,b:bMin,j:0,label:'w'},{w:wMin,b:bMax,j:0,label:'b'},{w:wMin,b:bMin,j:10,label:'J(w,b)'}]) {
+      const p=project(axis.w,axis.b,axis.j,dims);
+      sctx.fillText(axis.label, Math.max(8,Math.min(dims.w-48,p.x+8)),Math.max(18,Math.min(dims.h-8,p.y+12)));
+    }
+  }
+  function drawFit(w,b) {
+    const dims = fitCanvas(fit);
+    fctx.clearRect(0,0,dims.w,dims.h);
+    fctx.fillStyle = C.canvas; fctx.fillRect(0,0,dims.w,dims.h);
+    const pad = {l:42,r:18,t:24,b:36};
+    const xMin = 0, xMax = 6;
+    const yVals = data.flatMap(p => [p.y, w*p.x+b]);
+    const yMin = Math.min(0, Math.floor(Math.min(...yVals)-1));
+    const yMax = Math.ceil(Math.max(...yVals)+1);
+    const X = x => pad.l + (x-xMin)/(xMax-xMin)*(dims.w-pad.l-pad.r);
+    const Y = y => dims.h-pad.b - (y-yMin)/(yMax-yMin)*(dims.h-pad.t-pad.b);
+    fctx.strokeStyle = 'rgba(125,122,117,.20)'; fctx.lineWidth = 1;
+    fctx.fillStyle = C.muted; fctx.font = '12px -apple-system, BlinkMacSystemFont, Segoe UI, Arial';
+    for (let yy=Math.ceil(yMin); yy<=yMax; yy+=2) { fctx.beginPath(); fctx.moveTo(pad.l, Y(yy)); fctx.lineTo(dims.w-pad.r, Y(yy)); fctx.stroke(); fctx.fillText(String(yy), 10, Y(yy)+4); }
+    fctx.strokeStyle = C.border; fctx.beginPath(); fctx.moveTo(pad.l, pad.t); fctx.lineTo(pad.l, dims.h-pad.b); fctx.lineTo(dims.w-pad.r, dims.h-pad.b); fctx.stroke();
+    for (const p of data) {
+      const yhat = w*p.x + b;
+      fctx.strokeStyle = C.red; fctx.lineWidth = 2; fctx.beginPath(); fctx.moveTo(X(p.x), Y(p.y)); fctx.lineTo(X(p.x), Y(yhat)); fctx.stroke();
+    }
+    fctx.strokeStyle = C.blue; fctx.lineWidth = 3; fctx.beginPath();
+    fctx.moveTo(X(xMin), Y(w*xMin+b)); fctx.lineTo(X(xMax), Y(w*xMax+b)); fctx.stroke();
+    fctx.fillStyle = C.text;
+    for (const p of data) { fctx.beginPath(); fctx.arc(X(p.x), Y(p.y), 5, 0, Math.PI*2); fctx.fill(); fctx.lineWidth = 2; fctx.strokeStyle = C.canvas; fctx.stroke(); }
+    fctx.fillStyle = C.muted; fctx.fillText('x', dims.w-pad.r-4, dims.h-10); fctx.fillText('y', 14, pad.t-8);
+  }
+  function render() {
+    const w = Number(wRange.value), b = Number(bRange.value);
+    wOut.value = w.toFixed(2); bOut.value = b.toFixed(2);
+    costStat.textContent = cost(w,b).toFixed(3);
+    resStat.textContent = meanResidual(w,b).toFixed(3);
+    drawSurface(w,b); drawFit(w,b);
+  }
+  function setParams(w,b) { wRange.value = Math.max(wMin, Math.min(wMax, w)); bRange.value = Math.max(bMin, Math.min(bMax, b)); render(); }
+  document.getElementById('bestBtn').addEventListener('click', () => setParams(best.w, best.b));
+  document.getElementById('startBtn').addEventListener('click', () => setParams(1.10, .60));
+  document.getElementById('animateBtn').addEventListener('click', () => {
+    if (raf) { cancelAnimationFrame(raf); raf = null; return; }
+    let w = Number(wRange.value), b = Number(bRange.value), step = 0;
+    const tick = () => {
+      const alpha = 0.045;
+      let dw = 0, db = 0;
+      for (const p of data) { const e = (w*p.x + b) - p.y; dw += e*p.x; db += e; }
+      dw /= data.length; db /= data.length;
+      w -= alpha * dw; b -= alpha * db; setParams(w,b);
+      step += 1;
+      if (step < 160 && Math.hypot(dw,db) > .004) raf = requestAnimationFrame(tick); else raf = null;
+    };
+    tick();
+  });
+  function redrawSurface() { drawSurface(Number(wRange.value),Number(bRange.value)); }
+  function resetView() { azimuth=-Math.PI/4; elevation=.55; redrawSurface(); }
+  document.getElementById('resetViewBtn').addEventListener('click',resetView);
+  surface.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    drag={id:e.pointerId,x:e.clientX,y:e.clientY};
+    surface.setPointerCapture(e.pointerId); surface.classList.add('dragging'); surface.focus();
+  });
+  surface.addEventListener('pointermove',e=>{
+    if(!drag || drag.id!==e.pointerId) return;
+    azimuth-=(e.clientX-drag.x)*.009;
+    elevation=Math.max(.12,Math.min(1.42,elevation+(e.clientY-drag.y)*.007));
+    drag.x=e.clientX; drag.y=e.clientY; redrawSurface();
+  });
+  function endDrag(e) { if(drag && drag.id===e.pointerId) { drag=null;surface.classList.remove('dragging'); } }
+  surface.addEventListener('pointerup',endDrag); surface.addEventListener('pointercancel',endDrag); surface.addEventListener('lostpointercapture',endDrag);
+  surface.addEventListener('keydown',e=>{
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.key)) return;
+    e.preventDefault();
+    if(e.key==='Home') { resetView(); return; }
+    if(e.key==='ArrowLeft') azimuth-=.12;
+    if(e.key==='ArrowRight') azimuth+=.12;
+    if(e.key==='ArrowUp') elevation=Math.min(1.42,elevation+.08);
+    if(e.key==='ArrowDown') elevation=Math.max(.12,elevation-.08);
+    redrawSurface();
+  });
+  wRange.addEventListener('input', render); bRange.addEventListener('input', render);
+  window.addEventListener('resize', render);
+  render();
+})();
+</script>
